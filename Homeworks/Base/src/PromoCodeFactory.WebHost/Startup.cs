@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PromoCodeFactory.Core.Abstractions.Repositories;
@@ -14,10 +15,19 @@ namespace PromoCodeFactory.WebHost
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+
+            // Подключаем SQLite
+            services.AddDbContext<PromoCodeFactoryDbContext>(options =>
+                options.UseSqlite("Data Source=promocodefactory.db"));
+
+            // InMemory репозитории для Employee и Role (можно оставить для теста)
             services.AddSingleton(typeof(IRepository<Employee>), (x) => 
                 new InMemoryRepository<Employee>(FakeDataFactory.Employees));
             services.AddSingleton(typeof(IRepository<Role>), (x) => 
                 new InMemoryRepository<Role>(FakeDataFactory.Roles));
+
+            // Generic EF репозиторий
+            services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
 
             services.AddOpenApiDocument(options =>
             {
@@ -42,10 +52,21 @@ namespace PromoCodeFactory.WebHost
             {
                 x.DocExpansion = "list";
             });
-            
-            app.UseHttpsRedirection();
 
+            app.UseHttpsRedirection();
             app.UseRouting();
+
+            // ===== Пересоздание базы при каждом запуске =====
+            using (var scope = app.ApplicationServices.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<PromoCodeFactoryDbContext>();
+                context.Database.EnsureDeleted();
+                context.Database.EnsureCreated();
+
+                // Если есть метод заполнения тестовыми данными
+                FakeDataFactory.Seed(context);
+            }
+            // ===============================================
 
             app.UseEndpoints(endpoints =>
             {
