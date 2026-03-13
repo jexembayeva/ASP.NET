@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using PromoCodeFactory.Core.Domain.Administration;
 using PromoCodeFactory.Core.Domain.Customers;
-using PromoCodeFactory.Core.Domain.PromoCode;
+using PromoCodeFactory.Core.Domain.Partners;
+using PromoCodeFactory.Core.Domain.PromoCodes;
 
 namespace PromoCodeFactory.DataAccess.Data
 {
@@ -112,10 +113,25 @@ namespace PromoCodeFactory.DataAccess.Data
                 BeginDate = DateTime.UtcNow,
                 EndDate = DateTime.UtcNow.AddMonths(1),
                 Preference = SportsPreference,
-                Customer = Customers[0]
+                Customer = Customers[0],
+                Partner = DefaultPartner
             }
         };
 
+        // ------------------ Partners ------------------
+        public static readonly Partner DefaultPartner = new Partner
+        {
+            Id = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+            Name = "Amazon",
+            IsActive = true,
+            NumberIssuedPromoCodes = 0
+        };
+
+        public static IList<Partner> Partners => new List<Partner>
+        {
+            DefaultPartner
+        };
+        
         // ------------------ Метод Seed ------------------
         public static void Seed(PromoCodeFactoryDbContext context)
         {
@@ -169,10 +185,19 @@ namespace PromoCodeFactory.DataAccess.Data
                     promo.PreferenceId = promo.Preference.Id;
                     promo.Customer = context.Customers.Find(promo.Customer.Id);
                     promo.CustomerId = promo.Customer.Id;
+                    promo.Partner = context.Partners.Find(promo.Partner.Id);
+                    promo.PartnerId = promo.Partner.Id;
 
                     context.PromoCodes.Add(promo);
                 }
             }
+
+            context.SaveChanges();
+            
+            // Partners
+            foreach (var partner in Partners)
+                if (!context.Partners.Any(p => p.Id == partner.Id))
+                    context.Partners.Add(partner);
 
             context.SaveChanges();
         }

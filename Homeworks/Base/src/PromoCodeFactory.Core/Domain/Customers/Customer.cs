@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using PromoCodeFactory.Core.Domain.PromoCodes;
 
 namespace PromoCodeFactory.Core.Domain.Customers
 {
@@ -12,6 +13,6 @@ namespace PromoCodeFactory.Core.Domain.Customers
 
         public ICollection<CustomerPreference> CustomerPreferences { get; set; } = new List<CustomerPreference>();
 
-        public ICollection<PromoCode.PromoCode> PromoCodes { get; set; } = new List<PromoCode.PromoCode>();
+        public ICollection<PromoCode> PromoCodes { get; set; } = new List<PromoCode>();
     }
 }

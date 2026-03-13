@@ -1,84 +1,96 @@
 using Microsoft.AspNetCore.Mvc;
 using PromoCodeFactory.Core.Abstractions.Repositories;
 using PromoCodeFactory.Core.Domain.Customers;
-using PromoCodeFactory.Core.Domain.PromoCode;
+using PromoCodeFactory.Core.Domain.PromoCodes;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-[ApiController]
-[Route("api/[controller]")]
-public class PromoCodesController : ControllerBase
+namespace PromoCodeFactory.WebHost.Controllers
 {
-    private readonly IRepository<PromoCode> _promoRepository;
-    private readonly IRepository<Customer> _customerRepository;
-    private readonly IRepository<Preference> _preferenceRepository;
-
-    public PromoCodesController(
-        IRepository<PromoCode> promoRepository,
-        IRepository<Customer> customerRepository,
-        IRepository<Preference> preferenceRepository)
+    [ApiController]
+    [Route("api/[controller]")]
+    public class PromoCodesController : ControllerBase
     {
-        _promoRepository = promoRepository;
-        _customerRepository = customerRepository;
-        _preferenceRepository = preferenceRepository;
-    }
+        private readonly IRepository<PromoCode> _promoRepository;
+        private readonly IRepository<Customer> _customerRepository;
+        private readonly IRepository<Preference> _preferenceRepository;
 
-    /// <summary>
-    /// Выдать новый промокод клиентам с указанным предпочтением
-    /// </summary>
-    [HttpPost("give")]
-    public async Task<IActionResult> GivePromocodesToCustomersWithPreferenceAsync(Guid preferenceId, string code)
-    {
-        var preference = await _preferenceRepository.GetByIdAsync(preferenceId);
-        if (preference == null)
-            return NotFound("Preference not found");
-
-        var customers = (await _customerRepository.GetAllAsync())
-            .Where(c => c.CustomerPreferences.Any(cp => cp.PreferenceId == preferenceId))
-            .ToList();
-
-        foreach (var customer in customers)
+        public PromoCodesController(
+            IRepository<PromoCode> promoRepository,
+            IRepository<Customer> customerRepository,
+            IRepository<Preference> preferenceRepository)
         {
-            var promo = new PromoCode
-            {
-                Id = Guid.NewGuid(),
-                Code = code,
-                BeginDate = DateTime.UtcNow,
-                EndDate = DateTime.UtcNow.AddDays(30),
-                PreferenceId = preferenceId,
-                Preference = preference,
-                CustomerId = customer.Id,
-                Customer = customer
-            };
-            customer.PromoCodes.Add(promo);
-            await _promoRepository.AddAsync(promo);
+            _promoRepository = promoRepository;
+            _customerRepository = customerRepository;
+            _preferenceRepository = preferenceRepository;
         }
 
-        return Ok($"Промокод '{code}' выдан {customers.Count} клиентам.");
-    }
+        /// <summary>
+        /// Выдать новый промокод клиентам с указанным предпочтением
+        /// </summary>
+        [HttpPost("give")]
+        public async Task<IActionResult> GivePromocodesToCustomersWithPreferenceAsync(Guid preferenceId, string code)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+                return BadRequest("Promo code cannot be empty");
 
-    /// <summary>
-    /// Получить промокоды в диапазоне дат
-    /// </summary>
-    [HttpGet("get")]
-    public async Task<IActionResult> GetPromocodesAsync(string fromDate, string toDate)
-    {
-        if (!DateTime.TryParse(fromDate, out var from) || !DateTime.TryParse(toDate, out var to))
-            return BadRequest("Неверный формат даты");
+            var preference = await _preferenceRepository.GetByIdAsync(preferenceId);
+            if (preference == null)
+                return NotFound("Preference not found");
 
-        var promos = (await _promoRepository.GetAllAsync())
-            .Where(p => p.BeginDate >= from && p.EndDate <= to)
-            .Select(p => new
+            var customers = (await _customerRepository.GetAllAsync())
+                .Where(c => c.CustomerPreferences.Any(cp => cp.PreferenceId == preferenceId))
+                .ToList();
+
+            foreach (var customer in customers)
             {
-                p.Id,
-                p.Code,
-                p.BeginDate,
-                p.EndDate,
-                CustomerName = p.Customer != null ? $"{p.Customer.FirstName} {p.Customer.LastName}" : null,
-                PreferenceName = p.Preference?.Name
-            });
+                var promo = new PromoCode
+                {
+                    Id = Guid.NewGuid(),
+                    Code = code,
+                    BeginDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(30),
+                    PreferenceId = preferenceId,
+                    CustomerId = customer.Id
+                };
 
-        return Ok(promos);
+                await _promoRepository.AddAsync(promo);
+            }
+
+            return Ok($"Promo code '{code}' issued to {customers.Count} customers.");
+        }
+
+        /// <summary>
+        /// Получить промокоды в диапазоне дат
+        /// </summary>
+        [HttpGet("get")]
+        public async Task<IActionResult> GetPromocodesAsync(string fromDate, string toDate)
+        {
+            if (!DateTime.TryParse(fromDate, out var from) ||
+                !DateTime.TryParse(toDate, out var to))
+            {
+                return BadRequest("Invalid date format");
+            }
+
+            var promocodes = (await _promoRepository.GetAllAsync())
+                .Where(p => p.BeginDate >= from && p.BeginDate <= to)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Code,
+                    p.BeginDate,
+                    p.EndDate,
+                    CustomerName = p.Customer != null
+                        ? $"{p.Customer.FirstName} {p.Customer.LastName}"
+                        : null,
+                    PreferenceName = p.Preference != null
+                        ? p.Preference.Name
+                        : null
+                })
+                .ToList();
+
+            return Ok(promocodes);
+        }
     }
 }

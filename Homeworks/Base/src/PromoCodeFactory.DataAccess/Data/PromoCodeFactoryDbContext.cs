@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using PromoCodeFactory.Core.Domain.Administration;
 using PromoCodeFactory.Core.Domain.Customers;
-using PromoCodeFactory.Core.Domain.PromoCode;
+using PromoCodeFactory.Core.Domain.Partners;
+using PromoCodeFactory.Core.Domain.PromoCodes;
 
 namespace PromoCodeFactory.DataAccess.Data;
 
@@ -18,6 +19,10 @@ public class PromoCodeFactoryDbContext : DbContext
     public DbSet<PromoCode> PromoCodes { get; set; }
 
     public DbSet<CustomerPreference> CustomerPreferences { get; set; }
+    
+    public DbSet<Partner> Partners { get; set; }
+
+    public DbSet<PartnerLimit> PartnerLimits { get; set; }
 
     public PromoCodeFactoryDbContext(DbContextOptions<PromoCodeFactoryDbContext> options)
         : base(options)
@@ -33,6 +38,8 @@ public class PromoCodeFactoryDbContext : DbContext
         ConfigureCustomers(builder);
         ConfigurePromoCodes(builder);
         ConfigureCustomerPreferences(builder);
+        ConfigurePartners(builder);
+        ConfigurePartnerLimits(builder);
     }
 
     private void ConfigureEmployees(ModelBuilder builder)
@@ -105,9 +112,40 @@ public class PromoCodeFactoryDbContext : DbContext
             entity.HasOne(x => x.Customer)
                 .WithMany(x => x.PromoCodes)
                 .HasForeignKey(x => x.CustomerId);
+            
+            entity.HasOne(x => x.Partner)
+                .WithMany(x => x.PromoCodes)
+                .HasForeignKey(x => x.PartnerId);
         });
     }
 
+    private void ConfigurePartners(ModelBuilder builder)
+    {
+        builder.Entity<Partner>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.NumberIssuedPromoCodes);
+
+            entity.Property(x => x.IsActive);
+        });
+    }
+    
+    private void ConfigurePartnerLimits(ModelBuilder builder)
+    {
+        builder.Entity<PartnerLimit>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.Partner)
+                .WithMany(x => x.PartnerLimits)
+                .HasForeignKey(x => x.PartnerId);
+        });
+    }
+    
     private void ConfigureCustomerPreferences(ModelBuilder builder)
     {
         builder.Entity<CustomerPreference>(entity =>
